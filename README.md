@@ -1,20 +1,48 @@
 # Machine Learning Models
-### General Steps
-1. Feature Engineering
-2. Encoding
-3. Prepare train data
-  - Split validation and train set
-4. Test different parameters
-  - Plot errors
-5. Calculate RMSE for best model
-6. Prepare test data
-7. Predict test 
-  - RMSE of test
 
-## Decision Tree 
+## Feature Engineering
+Drop:
+- Alley
+
+Weird:
+- LotShape
+- LotConfig
+- Condition 1 + 2 in one variable
+- Exterior 1st + 2nd + MasVnrType + Foundation
+
+### Unchanged Variables
+- Street: convert to 0 and 1 binary instead of strings
+- OverallQual
+- OverallCond
+- ExterQual: convert to numerical
+- ExterCond: convert to numerical
+- BsmtCond: convert to numerical
+- BsmtExposure: convert to numerical
+  - CONTINUE FROM HERE ON FEATURE DESCRIPTION LIST
+
+### OHE Variables
+- LotShape (Weird)
+- Utilities
+- LotConfig (Weird)
+- LandSlope
+- LandContour
+- BldgType
+- HouseStyle
+- RoofStyle
+- Roof Matl
 
 
-## Random Forest
+### Variables that I could Encode (Categorical to numerical)
+- MSSubClass
+- MSZoning
+- Neighborhood
+- Condition 1 + 2 in one variable
+- Exterior 1st + 2nd + MasVnrType + Foundation
 
-## Gradient Boosting
+### Compute variables
+- Age: YearBuilt - current year
+- Year since remod: YearRemodAdd - current year
+- BsmtQual - Convert to height values
+
+
 

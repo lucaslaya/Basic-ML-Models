@@ -4,6 +4,7 @@ import numpy as np
 from Models.base_model import BaseModel
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
@@ -14,6 +15,8 @@ class RandomForest(BaseModel):
         # Model Specific parameter
         self.result_train_dict = {}
         self.result_val_dict = {}
+        self.grid_search = None
+        self.cv_results_df = None
 
         self.max_max_depth = 14
         self.max_n_estimators = 71
@@ -30,7 +33,9 @@ class RandomForest(BaseModel):
                                                         max_depth= m,
                                                         max_features= k,
                                                         bootstrap= True,
-                                                        max_samples= s)
+                                                        max_samples= s,
+                                                        n_jobs=-1
+                                                        )
 
                         tree_reg.fit(self.X_train, np.ravel(self.y_train))
 
@@ -42,15 +47,108 @@ class RandomForest(BaseModel):
 
         return self.result_train_dict, self.result_val_dict
 
-    def print_validation(self, top_n=10):
-        results_list = [
-            {'max_depth': k[0], 'n_estimators': k[1], 'max_samples': k[2], 'max_features': k[3], 'RMSE': v}
-            for k, v in self.result_val_dict.items()
-        ]
-        results_df = pd.DataFrame(results_list)
+    def fit_and_validate_optimized(self, n_jobs=-1, verbose=2):
+        """
+        Parallel grid search using GridSearchCV - MUCH FASTER than fit_and_validate().
 
-        sorted_df = results_df.sort_values(by='RMSE', ascending=True).head(top_n)
-        print(sorted_df)
+        Args:
+            n_jobs: Number of parallel jobs (-1 uses all cores)
+            verbose: Verbosity level (0=silent, 1=minimal, 2=detailed, 3=very detailed)
+        """
+        # Define parameter grid
+        param_grid = {
+            'max_depth': list(range(1, self.max_max_depth, 2)),
+            'n_estimators': list(range(1, self.max_n_estimators, 2)),
+            'max_samples': [0.6, 0.7, 0.8, 0.9],
+            'max_features': [0.6, 0.7, 0.8, 0.9],
+            'bootstrap': [True]
+        }
+
+        # Create base estimator
+        rf = RandomForestRegressor(random_state=self.random_seed)
+
+        # Combine train and validation sets for GridSearchCV
+        X_combined = pd.concat([self.X_train, self.X_val]).reset_index(drop=True)
+        y_combined = np.concatenate([self.y_train, self.y_val])
+
+        # Create custom CV split indices to match the original train/val split
+        train_indices = np.arange(len(self.X_train))
+        val_indices = np.arange(len(self.X_train), len(X_combined))
+        cv_split = [(train_indices, val_indices)]
+
+        # Create GridSearchCV
+        # Note: We use negative MSE because GridSearchCV maximizes scores
+        self.grid_search = GridSearchCV(
+            estimator=rf,
+            param_grid=param_grid,
+            scoring='neg_mean_squared_error',  # Will be converted to RMSE later
+            cv=cv_split,  # Use our custom train/val split
+            n_jobs=n_jobs,
+            verbose=verbose,
+            return_train_score=True
+        )
+
+        # Fit the grid search
+        total_combinations = (len(param_grid['max_depth']) *
+                            len(param_grid['n_estimators']) *
+                            len(param_grid['max_samples']) *
+                            len(param_grid['max_features']))
+        print(f"Starting grid search with {total_combinations} parameter combinations...")
+        print(f"Using {n_jobs if n_jobs > 0 else 'all available'} CPU cores\n")
+
+        self.grid_search.fit(X_combined, y_combined)
+
+        # Extract results and convert to your original format
+        results = self.grid_search.cv_results_
+
+        for i in range(len(results['params'])):
+            params = results['params'][i]
+            m = params['max_depth']
+            n = params['n_estimators']
+            s = params['max_samples']
+            k = params['max_features']
+
+            # Convert negative MSE to RMSE (assuming log-transformed target)
+            # Note: GridSearchCV returns negative MSE, so we negate and sqrt
+            val_rmse = np.sqrt(-results['mean_test_score'][i])
+            train_rmse = np.sqrt(-results['mean_train_score'][i])
+
+            self.result_train_dict[m, n, s, k] = train_rmse
+            self.result_val_dict[m, n, s, k] = val_rmse
+
+        # Store results as DataFrame for easy analysis
+        self.cv_results_df = pd.DataFrame({
+            'max_depth': [p['max_depth'] for p in results['params']],
+            'n_estimators': [p['n_estimators'] for p in results['params']],
+            'max_samples': [p['max_samples'] for p in results['params']],
+            'max_features': [p['max_features'] for p in results['params']],
+            'train_RMSE': [np.sqrt(-score) for score in results['mean_train_score']],
+            'val_RMSE': [np.sqrt(-score) for score in results['mean_test_score']],
+            'fit_time': results['mean_fit_time']
+        })
+
+        print(f"\nGrid search complete!")
+        print(f"Best parameters: {self.grid_search.best_params_}")
+        print(f"Best validation RMSE: {np.sqrt(-self.grid_search.best_score_):.6f}")
+
+        return self.result_train_dict, self.result_val_dict
+
+    def print_validation(self, top_n=10):
+        if self.cv_results_df is not None:
+            # Use the DataFrame created by GridSearchCV (includes fit times)
+            sorted_df = self.cv_results_df.sort_values(by='val_RMSE', ascending=True).head(top_n)
+            print("\nTop performing models:")
+            print(sorted_df[['max_depth', 'n_estimators', 'max_samples', 'max_features', 'val_RMSE', 'fit_time']])
+        else:
+            # Fallback to original implementation
+            results_list = [
+                {'max_depth': k[0], 'n_estimators': k[1], 'max_samples': k[2], 'max_features': k[3], 'RMSE': v}
+                for k, v in self.result_val_dict.items()
+            ]
+            results_df = pd.DataFrame(results_list)
+
+            sorted_df = results_df.sort_values(by='RMSE', ascending=True).head(top_n)
+            print(sorted_df)
 
     def plot_validation(self):
         fig, ax = plt.subplots(figsize=(15, 7))
@@ -104,7 +202,8 @@ class RandomForest(BaseModel):
             max_depth= max_depth,
             max_features= max_features,
             max_samples= max_samples,
-            bootstrap= True
+            bootstrap= True,
+            n_jobs=-1
         )
         tree_reg.fit(self.X_train, np.ravel(self.y_train))
 
@@ -120,7 +219,8 @@ class RandomForest(BaseModel):
             max_depth= max_depth,
             max_features= max_features,
             max_samples= max_samples,
-            bootstrap= True
+            bootstrap= True,
+            n_jobs=-1
         )
         tree_reg.fit(self.X, np.ravel(self.y))
 
