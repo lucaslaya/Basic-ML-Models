@@ -18,7 +18,40 @@ Weird:
 - ExterCond: convert to numerical
 - BsmtCond: convert to numerical
 - BsmtExposure: convert to numerical
-  - CONTINUE FROM HERE ON FEATURE DESCRIPTION LIST
+- TotalBsmtSF
+- BsmtUnfSF
+- HeatingQC: convert to numerical
+- CentralAir: Boolean
+- 1stFlrSF
+- 2ndFlrSF
+- LowQualFinSF
+- GrLivArea
+- BsmtFullBathmachine
+- BsmtHalfBath
+- FullBath
+- HalfBath
+- Bedroom
+- Kitchen
+- KitchenQual: convert to numerical
+- TotRmsAbvGrd 
+- Fireplaces
+- FireplaceQu: convert to numerical
+- GarageCars 
+- GarageArea 
+- GarageQual: convert to numerical
+- GarageCond: convert to numerical
+- WoodDeckSF
+- OpenPorchSF
+- EnclosedPorch
+- 3SsnPorch
+- ScreenPorch
+- PoolArea
+- PoolQc: convert to numerical
+- Fence: convert to numerical
+- MiscValue 
+- MoSold
+- YrSold
+
 
 ### OHE Variables
 - LotShape (Weird)
@@ -30,7 +63,14 @@ Weird:
 - HouseStyle
 - RoofStyle
 - Roof Matl
-
+- Heating
+- Electrical
+- Functional
+- GarageTyp
+- PavedDrive
+- MiscFeature
+- SaleType
+- SaleCondition
 
 ### Variables that I could Encode (Categorical to numerical)
 - MSSubClass
@@ -43,6 +83,7 @@ Weird:
 - Age: YearBuilt - current year
 - Year since remod: YearRemodAdd - current year
 - BsmtQual - Convert to height values
+- GarageAge: GarageYrBlt - current year
 
 
 
